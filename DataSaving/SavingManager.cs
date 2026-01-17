@@ -15,7 +15,7 @@ public class SavingManager : MonoBehaviour
     public int SetSampleRate = 90;
     private float _sampleRate;
 
-    private List<EyeTrackingDataFrame> _eyeTrackingData;
+    private List<EyteTrackingDataFrame> _eyeTrackingData;
     private List<InputDataFrame> _inputData;
     private SceneData _sceneData;
     private CalibrationData _participantCalibrationData;
@@ -177,7 +177,7 @@ public class SavingManager : MonoBehaviour
         return false;
     }
 
-    public void StoreEyeTrackingData(List<EyeTrackingDataFrame> eyeTrackingDataFrames)
+    public void StoreEyeTrackingData(List<EyteTrackingDataFrame> eyeTrackingDataFrames)
     {
         _eyeTrackingData = eyeTrackingDataFrames;
     }
@@ -224,7 +224,7 @@ public class SavingManager : MonoBehaviour
         return list;
     }
 
-    private List<String> ConvertToJson(List<EyeTrackingDataFrame> inputData)
+    private List<String> ConvertToJson(List<EyteTrackingDataFrame> inputData)
     {
         List<string> list = new List<string>();
         list.Add("[");

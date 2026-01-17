@@ -1,240 +1,158 @@
-﻿using System;
+﻿using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using Valve.VR;
-using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
-[DisallowMultipleComponent]
 public class CameraManager : MonoBehaviour
 {
-    #region Fields
+    public static CameraManager Instance;
 
-    public static CameraManager Instance { get; private set; }
-    
-    [SerializeField] private Camera mainCamera;
-    [SerializeField] private GameObject blackScreen;
-    [SerializeField] private GameObject calibrationOffset;
-    private GameObject _objectToFollow;
-    
-    private GameObject _seatPosition;
-    [SerializeField] private VRCam vRCamera;
-    private SceneLoadingHandler _sceneLoadingHandler;
+    [Header("Target Settings")]
+    public Transform seatPosition;     // 驾驶座位置 (Transform)
+    public GameObject objectToFollow;  // 车辆对象
 
-    #endregion
+    [Header("Camera Objects")]
+    public Camera VRCam;       // VR相机
+    public Camera NonVRCam;    // 调试用普通相机
 
-    #region PrivateMethods
+    // 内部变量：用于黑屏淡入淡出
+    private Canvas _fadeCanvas;
+    private Image _fadeImage;
+    private Coroutine _currentFadeRoutine;
 
     private void Awake()
     {
-        _sceneLoadingHandler = SceneLoadingHandler.Instance;
-        
-        //singleton pattern a la Unity
         if (Instance == null)
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            SetupFadeCanvas(); // 初始化黑屏UI
         }
         else
         {
             Destroy(gameObject);
         }
     }
-    
-    public void OnSceneLoaded(bool autoFadeIn)
-    {
-        _objectToFollow = SceneLoadingHandler.Instance.GetParticipantsCar();
-        _seatPosition = SceneLoadingHandler.Instance.GetSeatPosition();
-        vRCamera = this.gameObject.GetComponent<VRCam>();
-        
-        if (CalibrationManager.Instance.GetVRActivationState())
-        {
-            vRCamera.SetSeatPosition(_seatPosition);
-            vRCamera.Seat();
-        }
-        else
-        {
-            SetSeatPosition(_objectToFollow);
-        }
-
-        if (autoFadeIn)
-        {
-            StartCoroutine(FadeIntoTheScene());
-        }
-    }
 
     private void Start()
     {
-        _objectToFollow = SceneLoadingHandler.Instance.GetParticipantsCar();
-        _seatPosition = SceneLoadingHandler.Instance.GetSeatPosition();
-
-        if (CalibrationManager.Instance.GetVRActivationState())
+        if (objectToFollow == null)
         {
-            VRModeCameraSetUp();
-        }
-        else
-        {
-            NonVRModeCameraSetUp();
-        }
-        
-        StartCoroutine(FadeIntoTheScene());
-    }
-
-    IEnumerator FadeIntoTheScene()
-    {
-        yield return new WaitForSeconds(1);
-        FadeIn();
-    }
-
-    #endregion
-
-    #region PublicMethods
-
-    public void VRModeCameraSetUp()
-    {
-        this.gameObject.GetComponent<VRCam>().enabled = true;
-        this.gameObject.GetComponent<ChaseCam>().enabled = false;
-        blackScreen.gameObject.SetActive(false);
-        vRCamera = this.gameObject.GetComponent<VRCam>();
-        mainCamera.GetComponent<Camera>().stereoTargetEye = StereoTargetEyeMask.Both;
-
-        // FadeOut();
-        
-        if (CalibrationManager.Instance != null)
-        {
-            SetOffset(CalibrationManager.Instance.GetSeatCalibrationOffsetPosition());
-        }
-        else
-        {
-            SetOffset(Vector3.zero);
-            Debug.Log("<color=red>Error: </color>No Calibration Manager found, please add to the scene.");
-        }
-        
-        if (_objectToFollow != null)
-        {
-            vRCamera.SetSeatPosition(_seatPosition);
-            vRCamera.Seat();
+            var car = GameObject.FindGameObjectWithTag("Player");
+            if (car != null)
+            {
+                objectToFollow = car;
+                var seat = car.transform.Find("SeatPosition");
+                seatPosition = seat != null ? seat : car.transform;
+            }
         }
     }
 
-    public void NonVRModeCameraSetUp()
+    // ★★★ 修复 CS0029: VRCam 需要 GameObject ★★★
+    public GameObject GetSeatPosition()
     {
-        this.gameObject.GetComponent<ChaseCam>().enabled = true;
-        this.gameObject.GetComponent<VRCam>().enabled = false;
-        mainCamera.GetComponent<Camera>().stereoTargetEye = StereoTargetEyeMask.None;
-        mainCamera.GetComponent<Camera>().fieldOfView = 60f;
-        
-        // blackScreen.SetActive(true);
-        if (_objectToFollow != null)
-        {
-            SetOffset(Vector3.zero);
-            this.transform.position = GetSeatPositionVector3();
-        }
-    }
-    
-    public void FadeOut()
-    {
-        if (CalibrationManager.Instance.GetVRActivationState())
-        {
-            //set start color
-            SteamVR_Fade.Start(Color.clear, 0f);
-            //set and start fade to
-            SteamVR_Fade.Start(Color.black, 0);
-        }
-        else
-        {
-            blackScreen.SetActive(true);
-        }
+        if (seatPosition != null) return seatPosition.gameObject;
+        return this.gameObject;
     }
 
-    public void FadeIn()
+    // 兼容可能有的 GetSeatTransform 调用
+    public Transform GetSeatTransform()
     {
-        if (CalibrationManager.Instance.GetVRActivationState())
-        {
-            //set start color
-            SteamVR_Fade.Start(Color.black, 0f);
-            //set and start fade to
-            SteamVR_Fade.Start(Color.clear, 0f);
-        }
-        else
-        {
-            blackScreen.SetActive(false);
-        }
-    }
-    
-    public void AlphaFadeIn()
-    {
-        _objectToFollow.GetComponent<CarWindows>().SetInsideWindowsAlphaChannel(0);
-    }
-    
-    public void AlphaFadeOut()
-    {
-        _objectToFollow.GetComponent<CarWindows>().SetInsideWindowsAlphaChannel(1);
-    }
-
-    #region Setters
-
-    public void SetObjectToFollow(GameObject theObject)
-    {
-        _objectToFollow = theObject;
-    }
-
-    public void SetSeatPosition(GameObject seat)
-    {
-        _seatPosition = seat;
-    }
-        
-    public void SetOffset(Vector3 localOffset)
-    {
-        calibrationOffset.transform.localPosition = localOffset;
-    }
-
-    public void RespawnBehavior()
-    {
-        if (!CalibrationManager.Instance.GetVRActivationState())
-        {
-            this.gameObject.GetComponent<ChaseCam>().ForceChaseCamRotation();
-        }
-    }
-
-    #endregion
-    
-
-    #region Getters
-        
-    private Vector3 GetSeatPositionVector3()
-    {
-        return _objectToFollow.GetComponent<CarController>().GetSeatPosition().transform.position;
+        return seatPosition != null ? seatPosition : transform;
     }
 
     public GameObject GetObjectToFollow()
     {
-        return _objectToFollow;
+        return objectToFollow;
     }
 
-    public VRCam GetVRCamera()
+    public void VRModeCameraSetUp()
     {
-        return vRCamera;
+        if (VRCam != null) VRCam.gameObject.SetActive(true);
+        if (NonVRCam != null) NonVRCam.gameObject.SetActive(false);
     }
 
-    public GameObject GetSeatPosition()
+    public void NonVRModeCameraSetUp()
     {
-        return _seatPosition;
+        if (VRCam != null) VRCam.gameObject.SetActive(false);
+        if (NonVRCam != null) NonVRCam.gameObject.SetActive(true);
     }
-        
 
-    public GameObject GetCalibrationOffset()
+    // ★★★ 修复 CS7036: 添加默认参数 duration = 2.0f ★★★
+
+    public void FadeOut(float duration = 2.0f)
     {
-        return calibrationOffset;
+        StartFade(Color.black, duration);
     }
 
-    public Camera GetMainCamera()
+    public void FadeIn(float duration = 2.0f)
     {
-        return mainCamera;
+        StartFade(Color.clear, duration);
     }
 
-    #endregion
-    
-    
-    #endregion
+    // 兼容旧接口：AlphaFadeIn/Out
+    public void AlphaFadeOut(float duration = 2.0f)
+    {
+        FadeOut(duration);
+    }
+
+    public void AlphaFadeIn(float duration = 2.0f)
+    {
+        FadeIn(duration);
+    }
+
+    public void RespawnBehavior()
+    {
+        if (_fadeImage != null) _fadeImage.color = Color.black;
+        FadeIn(1.0f);
+    }
+
+    // --- 内部实现 ---
+
+    private void SetupFadeCanvas()
+    {
+        GameObject canvasObj = new GameObject("CameraFadeCanvas");
+        canvasObj.transform.SetParent(transform);
+        _fadeCanvas = canvasObj.AddComponent<Canvas>();
+        _fadeCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        _fadeCanvas.sortingOrder = 9999;
+
+        CanvasGroup cg = canvasObj.AddComponent<CanvasGroup>();
+        cg.blocksRaycasts = false; // 允许穿透点击
+
+        GameObject imageObj = new GameObject("FadeImage");
+        imageObj.transform.SetParent(canvasObj.transform);
+        _fadeImage = imageObj.AddComponent<Image>();
+        _fadeImage.color = Color.clear;
+        _fadeImage.raycastTarget = false;
+
+        RectTransform rt = _fadeImage.rectTransform;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        DontDestroyOnLoad(canvasObj);
+    }
+
+    private void StartFade(Color targetColor, float duration)
+    {
+        if (_currentFadeRoutine != null) StopCoroutine(_currentFadeRoutine);
+        _currentFadeRoutine = StartCoroutine(FadeRoutine(targetColor, duration));
+    }
+
+    private IEnumerator FadeRoutine(Color targetColor, float duration)
+    {
+        if (_fadeImage == null) yield break;
+
+        Color startColor = _fadeImage.color;
+        float timer = 0f;
+
+        while (timer < duration)
+        {
+            timer += Time.deltaTime;
+            _fadeImage.color = Color.Lerp(startColor, targetColor, timer / duration);
+            yield return null;
+        }
+        _fadeImage.color = targetColor;
+    }
 }

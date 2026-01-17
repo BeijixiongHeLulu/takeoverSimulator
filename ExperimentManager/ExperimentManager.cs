@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using PathCreation;
 using UnityEngine;
-using Valve.VR;
 using UnityEngine.SceneManagement;
 using UnityStandardAssets.Utility;
 

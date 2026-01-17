@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using LoopAr.Connector;
 using LoopAr.DataTransferObjects;
 using LoopAr.Internals;
 using UnityEngine;
@@ -36,7 +35,7 @@ namespace LoopAr.Controller
             {
                 ParticipantNumber = name,
                 EventTime = Time.time.ToString(),
-                EyeTrackingTimeStamp = EyeTrackingConnector.GetEyeTrackingTimeStamp(),
+                //EyeTrackingTimeStamp = EyeTrackingConnector.GetEyeTrackingTimeStamp(),
                 PositionRotationInformationData = new PositionRotationInformationData
                 {
                     FrameNumber = Time.frameCount,

@@ -1,18 +1,17 @@
-﻿using System;
+﻿using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.SceneManagement;
 
 public class SceneLoadingHandler : MonoBehaviour
 {
-    public static SceneLoadingHandler Instance { get; private set; }
+    public static SceneLoadingHandler Instance;
 
-    private GameObject _participantsCar;
-    private GameObject _seatPosition;
-    private bool _isLoadAdditiveModeRunning;
+    [Header("Settings")]
+    public GameObject participantsCar;
+    public bool isAdditiveLoading = false;
+
+    // 如果调用 LoadExperimentScenes() 不传参，默认加载这个场景
+    public string defaultExperimentSceneName = "Westbrueck";
 
     private void Awake()
     {
@@ -25,174 +24,80 @@ public class SceneLoadingHandler : MonoBehaviour
         {
             Destroy(gameObject);
         }
-        
-        SceneManager.sceneLoaded += OnSceneLoaded;
-    }
-    
-    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        AssignParticipantsCarAndSeatPosition();
-
-        if (CameraManager.Instance != null)
-        {
-            CameraManager.Instance.SetObjectToFollow(_participantsCar);
-            CameraManager.Instance.SetSeatPosition(_seatPosition);
-            SavingManager.Instance.SetParticipantCar(_participantsCar);
-        }
-        
-        /*if (_participantsCar !=null)
-        {
-            if (SceneManager.GetActiveScene().name != "SceneLoader")
-                _participantsCar.GetComponent<CarWindows>().SetInsideWindowsAlphaChannel(0);
-            else
-                _participantsCar.GetComponent<CarWindows>().SetInsideWindowsAlphaChannel(1);
-        }*/
-    }
-
-    private void Start()
-    {
-        AssignParticipantsCarAndSeatPosition();
-        
-        if (CameraManager.Instance != null)
-        {
-            CameraManager.Instance.SetObjectToFollow(_participantsCar);
-            CameraManager.Instance.SetSeatPosition(_seatPosition);
-        }
-    }
-
-    public void LoadExperimentScenes()
-    {
-        AssignParticipantsCarAndSeatPosition();
-
-        CameraManager.Instance.FadeOut();
-        StartCoroutine(LoadExperimentScenesAsyncAdditive());
-    }
-    
-    public void SceneChange(string targetScene)
-    {
-        CameraManager.Instance.FadeOut();
-        StartCoroutine(LoadScenesAsync(targetScene));
-    }
-
-    IEnumerator LoadScenesAsync(string targetScene)
-    {
-        // Debug.Log(targetScene);
-        yield return new WaitForSeconds(2);
-        Debug.Log("Loading...");
-        
-        AsyncOperation operation = SceneManager.LoadSceneAsync(targetScene);
-
-        while (!operation.isDone)
-        {
-            float progress = Mathf.Clamp01(operation.progress / .9f);
-            // Debug.Log(operation.progress);
-
-            if (progress >= .9f)
-            {
-                CameraManager.Instance.FadeOut();
-            }
-            
-            yield return null;
-        }
-        
-        AssignParticipantsCarAndSeatPosition();
-        CameraManager.Instance.OnSceneLoaded(true);
-    }
-    
-    public IEnumerator LoadExperimentScenesAsyncAdditive()
-    {
-        _isLoadAdditiveModeRunning = true;
-        Application.backgroundLoadingPriority = ThreadPriority.Low;
-        
-        // AsyncOperationHandle op1 = Addressables.LoadSceneAsync("MountainRoad");
-        AsyncOperation opMountainRoad = SceneManager.LoadSceneAsync("MountainRoad");
-
-        // opMountainRoad.allowSceneActivation = false;
-        
-        while (!opMountainRoad.isDone)
-        {
-            yield return null;
-        }
-        
-        // opMountainRoad.allowSceneActivation = true;
-
-        AsyncOperation op2 = SceneManager.LoadSceneAsync("Westbrueck", LoadSceneMode.Additive);
-
-        while (!op2.isDone)
-        {
-            yield return null;
-        }
-        
-        AsyncOperation op3 = SceneManager.LoadSceneAsync("CountryRoad", LoadSceneMode.Additive);
-        
-        while (!op3.isDone)
-        {
-            yield return null;
-        }
-        
-        AsyncOperation op4 = SceneManager.LoadSceneAsync("Autobahn", LoadSceneMode.Additive);
-        
-        while (!op4.isDone)
-        {
-            yield return null;
-        }
-
-        _participantsCar = MountainRoadManager.Instance.GetParticipantsCar();
-        _seatPosition = MountainRoadManager.Instance.GetSeatPosition();
-        _isLoadAdditiveModeRunning = false;
-        CameraManager.Instance.OnSceneLoaded(false);
-    }
-    
-    private void AssignParticipantsCarAndSeatPosition()
-    {
-        switch (SceneManager.GetActiveScene().name)
-        {
-            case "SceneLoader":
-                _participantsCar = SceneLoadingSceneManager.Instance.GetParticipantsCar();
-                break;
-            case "SeatCalibrationScene":
-                _participantsCar = SeatCalibrationManager.Instance.GetParticipantsCar();
-                _seatPosition = SeatCalibrationManager.Instance.GetSeatPosition();
-                break;
-            case "TrainingScene":
-                _participantsCar = TrainingHandler.Instance.testEventManager.GetParticipantCar();
-                _seatPosition = TrainingHandler.Instance.GetSeatPosition();
-                break;
-            case "MountainRoad":
-                _participantsCar = MountainRoadManager.Instance.GetParticipantsCar();
-                _seatPosition = MountainRoadManager.Instance.GetSeatPosition();
-                break;
-            case "Westbrueck":
-                _participantsCar = WestbrueckManager.Instance.GetParticipantsCar();
-                _seatPosition = WestbrueckManager.Instance.GetSeatPosition();
-                break;
-            case "CountryRoad":
-                _participantsCar = CountryRoadManager.Instance.GetParticipantsCar();
-                _seatPosition = CountryRoadManager.Instance.GetSeatPosition();
-                break;
-            case "Autobahn":
-                _participantsCar = AutobahnManager.Instance.GetParticipantsCar();
-                _seatPosition = AutobahnManager.Instance.GetSeatPosition();
-                break;
-        }
     }
 
     public GameObject GetParticipantsCar()
     {
-        AssignParticipantsCarAndSeatPosition();
-        return _participantsCar;
-    }
-    
-    public GameObject GetSeatPosition()
-    {
-        AssignParticipantsCarAndSeatPosition();
-        return _seatPosition;
+        if (participantsCar == null)
+        {
+            participantsCar = GameObject.FindGameObjectWithTag("Player");
+            if (participantsCar == null)
+                participantsCar = GameObject.Find("ParticipantsCar");
+        }
+        return participantsCar;
     }
 
     public bool GetAdditiveLoadingState()
     {
-        return _isLoadAdditiveModeRunning;
+        return isAdditiveLoading;
+    }
+
+    // ★★★ 修复 CS7036: 添加默认参数 ★★★
+    public void LoadExperimentScenes(string sceneName = "")
+    {
+        // 如果传入空字符串，使用默认场景名
+        string targetScene = string.IsNullOrEmpty(sceneName) ? defaultExperimentSceneName : sceneName;
+        StartCoroutine(LoadSceneSequence(targetScene));
+    }
+
+    public void SceneChange(string sceneName)
+    {
+        LoadExperimentScenes(sceneName);
+    }
+
+    private IEnumerator LoadSceneSequence(string sceneName)
+    {
+        isAdditiveLoading = true;
+        Debug.Log($"[SceneLoadingHandler] Loading: {sceneName}");
+
+        if (CameraManager.Instance != null)
+        {
+            CameraManager.Instance.FadeOut(1.0f);
+            yield return new WaitForSeconds(1.0f);
+        }
+
+        // 简单的场景加载逻辑
+        AsyncOperation op = SceneManager.LoadSceneAsync(sceneName);
+        if (op == null)
+        {
+            Debug.LogError($"[SceneLoadingHandler] Scene '{sceneName}' not found in Build Settings!");
+            isAdditiveLoading = false;
+            if (CameraManager.Instance != null) CameraManager.Instance.FadeIn(1.0f);
+            yield break;
+        }
+
+        op.allowSceneActivation = false;
+        while (op.progress < 0.9f)
+        {
+            yield return null;
+        }
+        op.allowSceneActivation = true;
+
+        while (!op.isDone)
+        {
+            yield return null;
+        }
+
+        Debug.Log($"[SceneLoadingHandler] Loaded: {sceneName}");
+
+        // 重置状态
+        participantsCar = null;
+        GetParticipantsCar();
+        isAdditiveLoading = false;
+
+        if (CameraManager.Instance != null)
+        {
+            CameraManager.Instance.FadeIn(1.0f);
+        }
     }
 }
-
-
