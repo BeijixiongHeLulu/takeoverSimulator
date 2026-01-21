@@ -1,84 +1,101 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.SceneManagement;
+﻿using UnityEngine;
 
 public class VRCam : MonoBehaviour
 {
-    #region Fields
+    [Header("--- 诊断面板 ---")]
+    public string status = "初始化中...";
+    public Transform targetSeat;
+    public Transform foundCar;
 
-    private bool _seatActivated;
-    private GameObject _seatPosition;
-    private Vector3 _formerPosition;
+    [Header("--- 设置 ---")]
+    public KeyCode recenterKey = KeyCode.R; // 按 R 键校准方向
 
-    #endregion
-    
-    #region PrivateMethods
+    // 内部变量
+    private Camera _vrCamera;
+    private Quaternion _rotationOffset = Quaternion.identity; // 记录校准时的偏差
 
-    private void Awake()
+    void Start()
     {
-        SceneManager.sceneLoaded += OnSceneLoaded;
+        _vrCamera = GetComponentInChildren<Camera>();
+        if (_vrCamera == null) Debug.LogError("VRCam: 找不到子物体Camera！");
+        Invoke("FindSeat", 0.5f); // 延迟一点找，给Manager一点时间
     }
 
-    private void Start()
+    void Update()
     {
-        if (CameraManager.Instance.GetSeatPosition() != null)
-        {
-            _seatPosition = CameraManager.Instance.GetSeatPosition();
-        }
-        
-        _formerPosition = new Vector3();
-    }
-    
-    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        /*if (CameraManager.Instance.GetSeatPosition() != null)
-        {
-            _seatPosition = CameraManager.Instance.GetSeatPosition();
-        }*/
+        // 允许随时按 R 键重置视角中心
+        if (Input.GetKeyDown(recenterKey)) Recenter();
     }
 
-    private void LateUpdate()
+    void LateUpdate()
     {
-        if (_seatActivated)
+        // 1. 还没找到座位就继续找
+        if (targetSeat == null) FindSeat();
+
+        // 2. 核心跟随逻辑
+        if (targetSeat != null && _vrCamera != null)
         {
-            if (_seatPosition != null)
-            {
-                transform.SetPositionAndRotation(_seatPosition.transform.position, _seatPosition.transform.rotation);
-            }
-            else
-            {
-                Debug.Log("<color=red>Error: </color>Seat position is not assigned!");
-            }
+            // 位置：眼睛对齐座位
+            transform.position = targetSeat.position - (transform.rotation * _vrCamera.transform.localPosition);
+
+            // 旋转：只跟随车身，【绝对不要】减去头部旋转
+            // 除非你按了 R 键，否则 _rotationOffset 是固定的
+            transform.rotation = targetSeat.rotation * _rotationOffset;
         }
     }
 
-    #endregion
-
-    #region PublicMethods
-
-    public void Seat()
+    void Recenter()
     {
-        _seatActivated = true;
+        if (targetSeat == null || _vrCamera == null) return;
+
+        // 计算当前头显相对于车身歪了多少度
+        float currentHeadY = _vrCamera.transform.localEulerAngles.y;
+
+        // 记录这个偏差，以后一直保持这个偏差
+        // 效果：现在的朝向 = 正前方
+        _rotationOffset = Quaternion.Euler(0, -currentHeadY, 0);
+
+        Debug.Log("VR 视角已校准！");
     }
 
-    public void UnSeat()
+    void FindSeat()
     {
-        transform.position = _formerPosition;
+        if (foundCar == null)
+        {
+            GameObject carObj = GameObject.FindGameObjectWithTag("Player");
+            if (carObj != null) foundCar = carObj.transform;
+            else if (ExperimentManager.Instance != null && ExperimentManager.Instance.GetParticipantsCar() != null)
+                foundCar = ExperimentManager.Instance.GetParticipantsCar().transform;
+        }
+
+        if (foundCar != null)
+        {
+            // 深度查找 SeatPosition
+            targetSeat = FindDeepChild(foundCar, "SeatPosition");
+            if (targetSeat != null && _rotationOffset == Quaternion.identity)
+            {
+                Recenter(); // 第一次找到座位时，自动校准一次
+            }
+        }
     }
 
-    public void SetPosition(Vector3 position)
+    Transform FindDeepChild(Transform parent, string name)
     {
-        transform.position = position;
-        _formerPosition = position;
-        _seatActivated = false;
+        Transform result = parent.Find(name);
+        if (result != null) return result;
+        foreach (Transform child in parent)
+        {
+            result = FindDeepChild(child, name);
+            if (result != null) return result;
+        }
+        return null;
     }
 
-    public void SetSeatPosition(GameObject seatPosition)
+    void OnGUI()
     {
-        _seatPosition = seatPosition;
+        GUIStyle style = new GUIStyle();
+        style.fontSize = 20;
+        style.normal.textColor = Color.green;
+        GUILayout.Label("按 'R' 重置视角中心", style);
     }
-
-    #endregion
 }
