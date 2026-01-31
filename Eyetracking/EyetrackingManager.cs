@@ -35,6 +35,10 @@ public class EyetrackingManager : MonoBehaviour
 
     void Update()
     {
+        if (PXR_Manager.Instance == null)
+        {
+            return;
+        }
         // 1. 获取注视数据
         PXR_EyeTracking.GetCombineEyeGazeVector(out combineGazeVector);
         PXR_EyeTracking.GetCombineEyeGazePoint(out combineGazeOrigin);

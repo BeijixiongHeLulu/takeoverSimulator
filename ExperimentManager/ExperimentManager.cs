@@ -126,31 +126,58 @@ public class ExperimentManager : MonoBehaviour
             trigger.DeactivateTheGameObjects();
         }
     }
-    
+
     // starting the experiment
+    // 把原来的 StartExperiment 替换成这个带监控的版本
     private IEnumerator StartExperiment()
     {
-        string condition = ConditionManager.Instance.GetExperimentalCondition();
-        
-        if (condition == "BaseCondition" || condition == "AudioOnly")
+        Debug.Log("【流程监控】1. 实验协程启动...");
+
+        // 1. 检查 TimeManager
+        if (TimeManager.Instance == null)
         {
-            // Debug.Log("Condition in EXP is BaseCondition or AudioOnly?: " + ConditionManager.Instance.GetExperimentalCondition());
-            _participantsCar.GetComponentInChildren<HUD_Advance>().ShutDownAllVisualsPermanently();
+            Debug.LogError("【严重错误】TimeManager 没找到！协程在此中断。");
+            yield break;
         }
-        
         TimeManager.Instance.SetExperimentStartTime();
         _isStartPressed = true;
-        while (SceneLoadingHandler.Instance.GetAdditiveLoadingState()) yield return null;
-        
+
+        // 2. 检查场景加载
+        Debug.Log("【流程监控】2. 等待场景加载...");
+        while (SceneLoadingHandler.Instance.GetAdditiveLoadingState())
+        {
+            // 如果这里死循环，说明 GetAdditiveLoadingState 一直是 true
+            yield return null;
+        }
+
         _scene = Scene.Experiment;
 
-        SavingManager.Instance.StartRecordingData();
-        CameraManager.Instance.FadeIn();
+        // 3. 检查 SavingManager 和 CameraManager
+        Debug.Log("【流程监控】3. 开始录制数据...");
+        if (SavingManager.Instance == null) Debug.LogError("【严重错误】SavingManager 缺失！");
+        else SavingManager.Instance.StartRecordingData();
+
+        if (CameraManager.Instance == null) Debug.LogError("【严重错误】CameraManager 缺失！");
+        else CameraManager.Instance.FadeIn();
+
+        // 4. 倒计时
+        Debug.Log($"【流程监控】4. 倒计时 {startExperimentDelay} 秒...");
         yield return new WaitForSeconds(startExperimentDelay);
-        _participantsCar.GetComponent<Rigidbody>().isKinematic = false;
-        _participantsCar.GetComponent<CarController>().TurnOnEngine();
+
+        // 5. 关键一步
+        Debug.Log("【流程监控】5. >>> 解锁车辆物理！ <<<");
+        if (_participantsCar == null)
+        {
+            Debug.LogError("【严重错误】_participantsCar 是空的！无法解锁物理。");
+        }
+        else
+        {
+            _participantsCar.GetComponent<Rigidbody>().isKinematic = false;
+            _participantsCar.GetComponent<CarController>().TurnOnEngine();
+            Debug.Log("【流程监控】成功：引擎已启动，物理已解锁。");
+        }
     }
-    
+
     private IEnumerator ReSpawnParticipant(float seconds)
     {
         _participantsCar.GetComponent<Rigidbody>().velocity = Vector3.zero;
@@ -163,9 +190,10 @@ public class ExperimentManager : MonoBehaviour
         CameraManager.Instance.AlphaFadeIn();
         _participantsCar.GetComponent<CarController>().TurnOnEngine();
     }
-    
+
     private void AssignParticipantsCar()
     {
+        // 1. 根据场景名找到车辆引用
         switch (SceneManager.GetActiveScene().name)
         {
             case "SceneLoader":
@@ -184,10 +212,29 @@ public class ExperimentManager : MonoBehaviour
                 _participantsCar = AutobahnManager.Instance.GetParticipantsCar();
                 break;
         }
-        
+
+        // 2. 这里的检查至关重要：确保车找到了
+        if (_participantsCar == null)
+        {
+            Debug.LogError("【严重错误】在当前场景中找不到 ParticipantsCar！请检查 SceneManagers。");
+            return;
+        }
+
+        // 3. 将车辆引用传递给其他系统
         PersistentTrafficEventManager.Instance.SetParticipantsCar(_participantsCar);
+
+        // ★★★【修复核心】：必须把车传给 SavingManager，否则 InputRecorder 会报错崩溃 ★★★
+        if (SavingManager.Instance != null)
+        {
+            SavingManager.Instance.SetParticipantCar(_participantsCar);
+            Debug.Log("【系统连接】已将车辆引用传递给 SavingManager。");
+        }
+        else
+        {
+            Debug.LogError("【严重错误】SavingManager 缺失！数据无法记录。");
+        }
     }
-    
+
     #endregion
 
     #region Public Methods

@@ -10,13 +10,13 @@ public class CarController : MonoBehaviour
     [SerializeField] private float torque = 200f;
     [SerializeField] private float maxSteerAngle = 30f;
     [SerializeField] private float maxBrakeTorque = 500f;
-    [SerializeField] private bool allWheelDrive= false;
+    [SerializeField] private bool allWheelDrive = false;
     [SerializeField] private bool rearBreakOnly = true;
     [SerializeField] private float maximumSpeedInKmH = 120f;
     [SerializeField] private GameObject seatPosition;
-    
+
     private Rigidbody _rigidbody;
-    
+
     private float _maximumSpeed;//meter per seconds
     private float _currentSpeed;
     [SerializeField] private bool _engineOn = true;
@@ -25,8 +25,8 @@ public class CarController : MonoBehaviour
     private void Awake()
     {
         _maximumSpeed = maximumSpeedInKmH / 3.6f;
-        if(GetComponent<AxisStabilizer>()!=null)
-            GetComponent<AxisStabilizer>().AssignWheels(frontWheels[0],frontWheels[1],rearWheels[0],rearWheels[1]);
+        if (GetComponent<AxisStabilizer>() != null)
+            GetComponent<AxisStabilizer>().AssignWheels(frontWheels[0], frontWheels[1], rearWheels[0], rearWheels[1]);
     }
 
     // Start is called before the first frame update
@@ -40,16 +40,16 @@ public class CarController : MonoBehaviour
     void FixedUpdate()
     {
         // Debug.Log("Speed Km/h: " + _currentSpeed * 3.6);
-      _currentSpeed = _rigidbody.velocity.magnitude;
+        _currentSpeed = _rigidbody.velocity.magnitude;
     }
 
     public void MoveVehicle(float accelerationInput, float brakeInput, float steeringInput)
     {
         if (!_engineOn) return;
-        
+
         foreach (var wheel in frontWheels)
         {
-            TransferInputToWheels(wheel, accelerationInput,brakeInput, steeringInput);
+            TransferInputToWheels(wheel, accelerationInput, brakeInput, steeringInput);
         }
 
         foreach (var wheel in rearWheels)
@@ -60,7 +60,7 @@ public class CarController : MonoBehaviour
 
         //Debug.Log(_rigidbody.velocity.magnitude);
     }
-    
+
     void TransferInputToWheels(WheelCollider wheelCol, float acceleration, float brake)
     {
         brake = Mathf.Clamp(brake, 0, 1) * maxBrakeTorque;
@@ -68,11 +68,11 @@ public class CarController : MonoBehaviour
 
         float thrustTorque = CalculateThrustTorque(acceleration);
         //wheelCol.motorTorque = acceelelartionBoost*   thrustTorque;
-        wheelCol.motorTorque = thrustTorque;
+        wheelCol.motorTorque = Mathf.Clamp(thrustTorque, 0, _maximumSpeed);
         /*Debug.Log( "Torque: " + wheelCol.motorTorque + ", rpm: " +    wheelCol.rpm);*/
         wheelCol.brakeTorque = brake;
     }
-    
+
 
     void TransferInputToWheels(WheelCollider wheelCol, float acceleration, float brake, float steering)
     {
@@ -80,15 +80,15 @@ public class CarController : MonoBehaviour
         //steering = Mathf.Clamp(steering, -1, 1) * maxSteerAngle;
         steering = steering * maxSteerAngle;
         brake = Mathf.Clamp(brake, 0, 1) * maxBrakeTorque;
-//        Debug.Log("accel" + acceleration + " brake" + brake);
+        //        Debug.Log("accel" + acceleration + " brake" + brake);
         if (allWheelDrive)
         {
             wheelCol.motorTorque = CalculateThrustTorque(acceleration);
         }
-        
-        if(!rearBreakOnly)
+
+        if (!rearBreakOnly)
             wheelCol.brakeTorque = brake;
-        
+
         wheelCol.steerAngle = steering;
     }
 
@@ -123,7 +123,7 @@ public class CarController : MonoBehaviour
 
     public void SetMaximumSpeed(float speedInKmh)
     {
-        _maximumSpeed = speedInKmh/3.6f;
+        _maximumSpeed = speedInKmh / 3.6f;
     }
 
     public float GetMaximumSpeed()
@@ -145,7 +145,7 @@ public class CarController : MonoBehaviour
     {
         _engineOn = state;
     }
-    
+
     public Rigidbody GetRigidbody()
     {
         return _rigidbody;
@@ -158,6 +158,6 @@ public class CarController : MonoBehaviour
 
     public float GetSterring()
     {
-        return -frontWheels[0].steerAngle/maxSteerAngle;
+        return -frontWheels[0].steerAngle / maxSteerAngle;
     }
 }
